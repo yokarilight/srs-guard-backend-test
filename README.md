@@ -34,4 +34,4 @@ pnpm test:e2e   # e2e 測試，使用 mongodb-memory-server，不需要啟動 Mo
 | 模組 | API |
 | --- | --- |
 | F1 主題管理 | `GET/POST /api/topics`（`?scope=all\|mine`）、`GET/PATCH/DELETE /api/topics/:topicId` |
-| F8 驗證（最小版） | `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me`、初始化管理者腳本 |
+| F8 帳號與登入 | `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me`、`PATCH /api/auth/password`、`PATCH /api/me`（我的角色）、`GET/POST /api/users`、`PATCH /api/users/:userId`（僅管理者：停用、重設密碼、改名、改權限）、初始化管理者腳本 |

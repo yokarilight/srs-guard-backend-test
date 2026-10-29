@@ -1,6 +1,9 @@
 export const SESSION_COOKIE = 'sid';
 
-export function sessionTtlMs(): number {
-  const hours = Number(process.env.SESSION_TTL_HOURS ?? 8);
-  return (Number.isFinite(hours) && hours > 0 ? hours : 8) * 60 * 60 * 1000;
-}
+// 登入與修改密碼每個 IP 每分鐘可嘗試的次數
+export const AUTH_RATE_LIMIT = {
+  default: {
+    limit: () => Number(process.env.AUTH_RATE_LIMIT_PER_MINUTE ?? 5),
+    ttl: 60_000,
+  },
+};

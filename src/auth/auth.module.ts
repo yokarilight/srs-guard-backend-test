@@ -1,17 +1,16 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SessionsModule } from '../sessions/sessions.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
-import { Session, SessionSchema } from './schemas/session.schema.js';
 
 @Module({
   imports: [
     UsersModule,
-    MongooseModule.forFeature([{ name: Session.name, schema: SessionSchema }]),
+    SessionsModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
   ],
   controllers: [AuthController],

@@ -1,20 +1,13 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { createHash, randomBytes } from 'node:crypto';
-import { Model } from 'mongoose';
+import type { SessionDocument } from '../sessions/schemas/session.schema.js';
+import { SessionsService } from '../sessions/sessions.service.js';
 import type { UserDocument } from '../users/schemas/user.schema.js';
 import { UsersService } from '../users/users.service.js';
-import { sessionTtlMs } from './auth.constants.js';
-import { Session, SessionDocument } from './schemas/session.schema.js';
-
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectModel(Session.name) private readonly sessionModel: Model<Session>,
+    private readonly sessionsService: SessionsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -31,34 +24,20 @@ export class AuthService {
     ) {
       throw new UnauthorizedException('Email 或密碼錯誤');
     }
-    const token = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + sessionTtlMs());
-    await this.sessionModel.create({
-      tokenHash: hashToken(token),
-      userId: user._id,
-      expiresAt,
-    });
+    const { token, expiresAt } = await this.sessionsService.create(user._id);
     return { user, token, expiresAt };
   }
 
-  async logout(token: string): Promise<void> {
-    await this.sessionModel.deleteOne({ tokenHash: hashToken(token) });
+  logout(token: string): Promise<void> {
+    return this.sessionsService.revoke(token);
   }
 
-  /**
-   * 驗證 session 並採滑動逾時：剩餘時間不到一半時延長，避免每個請求都寫 DB。
-   * 回傳的 expiresAt 有變動時，呼叫端需要重發 cookie。
-   */
-  async authenticate(
-    token: string,
-  ): Promise<{
+  async authenticate(token: string): Promise<{
     user: UserDocument;
     session: SessionDocument;
     renewed: boolean;
   } | null> {
-    const session = await this.sessionModel
-      .findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } })
-      .exec();
+    const session = await this.sessionsService.findValid(token);
     if (!session) return null;
 
     const user = await this.usersService.findById(session.userId);
@@ -67,12 +46,7 @@ export class AuthService {
       return null;
     }
 
-    const ttl = sessionTtlMs();
-    const renewed = session.expiresAt.getTime() - Date.now() < ttl / 2;
-    if (renewed) {
-      session.expiresAt = new Date(Date.now() + ttl);
-      await session.save();
-    }
+    const renewed = await this.sessionsService.touch(session);
     return { user, session, renewed };
   }
 }

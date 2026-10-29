@@ -1,30 +1,24 @@
-import { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
-import { Test } from '@nestjs/testing';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Model, Types } from 'mongoose';
 import request from 'supertest';
-import { App } from 'supertest/types.js';
-import { AppModule, configureApp } from '../src/app.module.js';
 import { Revision } from '../src/revisions/schemas/revision.schema.js';
 import { UsersService } from '../src/users/users.service.js';
+import {
+  type Agent,
+  createTestApp,
+  login,
+  type TestContext,
+} from './helpers.js';
 
 describe('Topics (e2e)', () => {
-  let mongo: MongoMemoryServer;
-  let app: INestApplication<App>;
-  let alice: ReturnType<typeof request.agent>;
-  let bob: ReturnType<typeof request.agent>;
+  let ctx: TestContext;
+  let app: TestContext['app'];
+  let alice: Agent;
+  let bob: Agent;
 
   beforeAll(async () => {
-    mongo = await MongoMemoryServer.create();
-    process.env.MONGODB_URI = mongo.getUri('srs-guard-test');
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    ctx = await createTestApp();
+    app = ctx.app;
 
     const users = app.get(UsersService);
     await users.create({
@@ -38,22 +32,11 @@ describe('Topics (e2e)', () => {
       name: 'Bob',
     });
 
-    alice = request.agent(app.getHttpServer());
-    bob = request.agent(app.getHttpServer());
-    await alice
-      .post('/api/auth/login')
-      .send({ email: 'alice@example.com', password: 'alice-pass' })
-      .expect(200);
-    await bob
-      .post('/api/auth/login')
-      .send({ email: 'bob@example.com', password: 'bob-pass' })
-      .expect(200);
+    alice = await login(app, 'alice@example.com', 'alice-pass');
+    bob = await login(app, 'bob@example.com', 'bob-pass');
   });
 
-  afterAll(async () => {
-    await app.close();
-    await mongo.stop();
-  });
+  afterAll(() => ctx.close());
 
   it('rejects unauthenticated requests', async () => {
     await request(app.getHttpServer()).get('/api/topics').expect(401);
